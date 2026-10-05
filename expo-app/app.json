@@ -1,0 +1,8 @@
+{
+  "expo": {
+    "name": "Ведомость задолжников",
+    "slug": "rent-debtors-app",
+    "version": "1.0.0",
+    "orientation": "portrait"
+  }
+}

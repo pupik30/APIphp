@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Ведомость задолжников по квартплате</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Ведомость задолжников по квартплате</h1>
+
+    <p id="message" class="message"></p>
+
+    <table id="report">
+        <thead>
+            <tr>
+                <th class="num">№ п/п</th>
+                <th>ФИО владельца</th>
+                <th>Тип квартиры</th>
+                <th class="num">Начислено, руб.</th>
+                <th class="num">Внесено, руб.</th>
+                <th class="num">Задолженность, руб.</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+            <tr>
+                <td colspan="5">Итого задолженность</td>
+                <td class="num debt" id="total"></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <h2>Прейскурант</h2>
+    <table id="price_list">
+        <thead>
+            <tr>
+                <th class="num">№ п/п</th>
+                <th>Тип квартиры</th>
+                <th class="num">Стоимость метра жилой площади, руб.</th>
+                <th class="num">Коммунальные услуги на человека, руб.</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h2>Квартиросъемщики</h2>
+    <table id="tenants">
+        <thead>
+            <tr>
+                <th class="num">№ п/п</th>
+                <th>ФИО владельца</th>
+                <th class="num">Проживающих</th>
+                <th class="num">Жилая площадь, м²</th>
+                <th>Тип квартиры</th>
+                <th class="num">Стоимость квартиры, руб.</th>
+                <th class="num">Сумма квартплаты, руб.</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        // Эндпоинты URLок <---------------------------------------------------------------------------------------------------------------
+        const API_REPORT = 'debtors_report.php';
+        const API_PRICE_LIST = 'read_price_list.php';
+        const API_TENANTS = 'read_tenants.php';
+
+        const money = v => Number(v).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const message = document.getElementById('message');
+
+        async function getJson(url) {
+            const res = await fetch(url);
+            const text = await res.text();
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error('Сервер вернул не JSON (HTTP ' + res.status + '): ' + text.slice(0, 300));
+            }
+        }
+
+
+        function fillTable(tbody, rows) {
+            tbody.innerHTML = '';
+            rows.forEach(cells => {
+                const tr = document.createElement('tr');
+                cells.forEach(([text, cls]) => {
+                    const td = document.createElement('td');
+                    td.textContent = text;
+                    if (cls) td.className = cls;
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function load() {
+            try {
+                const report = await getJson(API_REPORT);
+                if (report.records) {
+                    let total = 0;
+                    fillTable(document.querySelector('#report tbody'), report.records.map((r, i) => {
+                        total += Number(r.debt);
+                        return [[i + 1, 'num'], [r.owner_name], [r.apartment_type],
+                                [money(r.apartment_cost), 'num'], [money(r.rent_paid), 'num'], [money(r.debt), 'num debt']];
+                    }));
+                    document.getElementById('total').textContent = money(total);
+                } else {
+                    message.textContent = report.message || 'Ошибка';
+                    document.getElementById('report').hidden = true;
+                }
+
+                const prices = await getJson(API_PRICE_LIST);
+                fillTable(document.querySelector('#price_list tbody'), prices.records.map(r => [
+                    [r.serial_no, 'num'], [r.apartment_type], [money(r.price_per_meter), 'num'], [money(r.utilities_per_person), 'num']
+                ]));
+
+                const tenants = await getJson(API_TENANTS);
+                fillTable(document.querySelector('#tenants tbody'), tenants.records.map(r => [
+                    [r.serial_no, 'num'], [r.owner_name], [r.residents_count, 'num'], [r.living_area, 'num'],
+                    [r.apartment_type], [money(r.apartment_cost), 'num'], [money(r.rent_paid), 'num']
+                ]));
+            } catch (err) {
+                message.textContent = err.message;
+            }
+        }
+
+        load();
+    </script>
+</body>
+</html>
